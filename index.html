@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>刷题</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">刷题<span class="sub">与「织题」联动</span></div>
+  <div class="top-actions">
+    <label class="btn small">导入数据<input type="file" id="import-file" accept=".json,application/json" hidden></label>
+    <button class="btn small" id="btn-export">导出数据</button>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<template id="tpl-home">
+  <div id="paper-list"></div>
+  <div class="empty" id="home-empty" hidden>
+    还没有题库。先在 Mac 上用织题的「PDF 导入」生成刷题 JSON，然后把文件放到 iCloud Drive，
+    在这里点「导入数据」选择它。
+  </div>
+</template>
+
+<template id="tpl-paper">
+  <div class="paper-top">
+    <button class="btn small" id="btn-back">← 返回</button>
+    <span id="paper-title"></span>
+    <span id="paper-progress" class="qmeta"></span>
+  </div>
+  <div class="question-card" id="qcard">
+    <div id="q-stem" class="q-stem"></div>
+    <div id="q-options"></div>
+    <div id="q-essay" hidden>
+      <p class="qmeta">本题为问答/材料题，请对照参考答案自评：</p>
+      <button class="btn grade-btn ok" id="btn-right">标记正确</button>
+      <button class="btn grade-btn bad" id="btn-wrong">标记错误</button>
+    </div>
+    <div id="q-answer" hidden></div>
+    <div id="q-insight" hidden>
+      <div class="qmeta">心得（会随导出带回织题）</div>
+      <textarea id="insight-input" rows="3" placeholder="写下你的思路、为什么错、以后注意什么"></textarea>
+    </div>
+    <div class="q-foot">
+      <button class="btn" id="btn-prev">上一题</button>
+      <button class="btn" id="btn-star">☆ 收藏</button>
+      <button class="btn primary" id="btn-next">下一题</button>
+    </div>
+  </div>
+  <div id="q-counts" class="qmeta"></div>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
