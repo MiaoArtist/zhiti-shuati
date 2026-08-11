@@ -56,9 +56,11 @@ async function saveData() {
 }
 
 // ================= 云同步配置 =================
-const cloud = { enabled: false, url: '', token: '', lastSync: '' };
+const cloud = { enabled: false, mode: 'github', url: '', repo: '', path: 'sync-data.json', token: '', lastSync: '' };
 function loadCloudCfg() {
   try { Object.assign(cloud, JSON.parse(localStorage.getItem(CFG_KEY) || '{}')); } catch (e) { /* ignore */ }
+  if (!cloud.mode) cloud.mode = 'github';
+  if (!cloud.path) cloud.path = 'sync-data.json';
 }
 function saveCloudCfg() { localStorage.setItem(CFG_KEY, JSON.stringify(cloud)); }
 
@@ -69,16 +71,47 @@ function schedulePush() {
   pushTimer = setTimeout(pushSync, 1500);
 }
 function syncBase() { return cloud.url.trim().replace(/\/+$/, '') + '/api/sync'; }
+function syncReady() {
+  if (!cloud.enabled) return false;
+  if (cloud.mode === 'github') return !!(cloud.repo && cloud.token);
+  return !!(cloud.url && cloud.token);
+}
+function b64enc(s) { return btoa(unescape(encodeURIComponent(s))); }
+function b64dec(s) { return decodeURIComponent(escape(atob(s))); }
+
+async function ghGet() {
+  const r = await fetch(`https://api.github.com/repos/${cloud.repo}/contents/${cloud.path}`, {
+    headers: { 'Authorization': 'Bearer ' + cloud.token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+  });
+  if (r.status === 404) return { notFound: true };
+  if (!r.ok) { const e = new Error('GitHub HTTP ' + r.status); e.status = r.status; throw e; }
+  const meta = await r.json();
+  return { content: b64dec(meta.content), sha: meta.sha };
+}
+async function ghPut(jsonStr, sha) {
+  const r = await fetch(`https://api.github.com/repos/${cloud.repo}/contents/${cloud.path}`, {
+    method: 'PUT',
+    headers: { 'Authorization': 'Bearer ' + cloud.token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: 'zhiti sync', content: b64enc(jsonStr), ...(sha ? { sha } : {}) }),
+  });
+  if (!r.ok) { const e = new Error('GitHub HTTP ' + r.status); e.status = r.status; throw e; }
+}
 
 async function pullSync(silent) {
-  if (!cloud.enabled || !cloud.url || !cloud.token) return;
+  if (!syncReady()) return;
   try {
-    const r = await fetch(syncBase(), { headers: { 'X-Auth-Token': cloud.token } });
-    if (r.status === 404) return; // 云端还没有数据
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const body = await r.json();
-    if (body.data) {
-      mergeData(body.data);
+    let payload = null;
+    if (cloud.mode === 'github') {
+      const g = await ghGet();
+      if (!g.notFound) payload = JSON.parse(g.content);
+    } else {
+      const r = await fetch(syncBase(), { headers: { 'X-Auth-Token': cloud.token } });
+      if (r.status === 404) { /* 云端还没有数据 */ }
+      else if (!r.ok) throw new Error('HTTP ' + r.status);
+      else { const body = await r.json(); if (body.data) payload = body.data; }
+    }
+    if (payload) {
+      mergeData(payload);
       if (!silent) toast('已同步云端最新数据');
     }
     cloud.lastSync = new Date().toLocaleTimeString();
@@ -88,14 +121,23 @@ async function pullSync(silent) {
   }
 }
 async function pushSync() {
-  if (!cloud.enabled || !cloud.url || !cloud.token) return;
+  if (!syncReady()) return;
   try {
-    const r = await fetch(syncBase(), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': cloud.token },
-      body: JSON.stringify(data),
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    if (cloud.mode === 'github') {
+      const jsonStr = JSON.stringify(data);
+      for (let i = 0; i < 3; i++) {
+        const g = await ghGet();
+        try { await ghPut(jsonStr, g.notFound ? null : g.sha); break; }
+        catch (e) { if (e.status === 409 && i < 2) continue; throw e; }
+      }
+    } else {
+      const r = await fetch(syncBase(), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Token': cloud.token },
+        body: JSON.stringify(data),
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+    }
     cloud.lastSync = new Date().toLocaleTimeString();
     saveCloudCfg();
   } catch (e) { console.warn('同步推送失败', e); }
@@ -292,9 +334,21 @@ function updateCounts() {
 function renderSettings() {
   main.innerHTML = tplSettings.innerHTML;
   $('#s-enabled').checked = cloud.enabled;
+  $('#s-mode').value = cloud.mode;
+  $('#s-repo').value = cloud.repo;
   $('#s-url').value = cloud.url;
   $('#s-token').value = cloud.token;
   $('#s-last').textContent = cloud.lastSync ? `上次同步：${cloud.lastSync}` : '尚未同步';
+  updateSyncUI();
+  $('#s-mode').addEventListener('change', updateSyncUI);
+}
+
+function updateSyncUI() {
+  const gh = $('#s-mode').value === 'github';
+  $('#s-repo-row').hidden = !gh;
+  $('#s-url-row').hidden = gh;
+  $('#s-token-label').textContent = gh ? 'GitHub 令牌（PAT，需仓库读写权限）' : '同步口令（SYNC_TOKEN）';
+  $('#s-token').placeholder = gh ? 'github_pat_...' : '口令';
 }
 
 function nav(delta) {
@@ -355,14 +409,24 @@ function bind() {
     else if (t.id === 'btn-wrong') gradeEssay('wrong');
     else if (t.id === 'btn-sync-save') {
       cloud.enabled = $('#s-enabled').checked;
+      cloud.mode = $('#s-mode').value;
+      cloud.repo = $('#s-repo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/+$/, '');
       cloud.url = $('#s-url').value.trim();
       cloud.token = $('#s-token').value.trim();
-      if (cloud.enabled && (!cloud.url || !cloud.token)) { toast('开启云同步需要填地址和口令', 'error'); return; }
+      if (cloud.enabled && !syncReady()) {
+        toast(cloud.mode === 'github' ? '开启云同步需要填仓库（用户名/仓库名）和令牌' : '开启云同步需要填地址和口令', 'error');
+        return;
+      }
       saveCloudCfg();
       if (cloud.enabled) { toast('正在连接云端…'); pullSync(false).then(() => { renderSettings(); toast('云同步已开启'); }); }
       else { toast('云同步已关闭（数据仍在本机）'); }
     }
-    else if (t.id === 'btn-sync-now') { pullSync(false).then(() => pushSync()); }
+    else if (t.id === 'btn-sync-now') {
+      pullSync(false).then(() => pushSync()).then(() => {
+        const el = $('#s-last');
+        if (el) el.textContent = cloud.lastSync ? `上次同步：${cloud.lastSync}` : '尚未同步';
+      });
+    }
   });
 }
 

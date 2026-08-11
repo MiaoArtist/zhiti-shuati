@@ -11,10 +11,27 @@
 
 ## 云同步（全自动）
 
+刷题应用顶栏「云同步」提供两种后端：
+
+### 方式一：GitHub 私有仓库（推荐，国内直连可用）
+
+1. 创建私有仓库（我已建好 `miaoartist/zhiti-shuati-sync`，直接用即可）。
+2. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token：
+   - Repository access：Only select repositories → 勾选 `zhiti-shuati-sync`；
+   - Permissions → Contents：**Read and write**；
+   - 生成后复制令牌（`github_pat_...`）。
+3. 刷题应用「云同步」→ 同步方式选 GitHub → 仓库填 `miaoartist/zhiti-shuati-sync`，令牌粘贴 → 开启。
+4. 之后：打开自动拉取、有改动自动推送，多台设备填同一套配置即互通；冲突按每条记录的 `updatedAt` 保留新。
+
+> 为什么不用 Cloudflare Worker 了：`*.workers.dev` 域名在国内被运营商/防火墙屏蔽（DNS 被污染、HTTPS 握手被重置），手机和电脑都连不上，worker 本身部署是正常的。
+
+### 方式二：Cloudflare Worker（自定义地址）
+
 1. 部署 `sync-worker/`（Cloudflare Workers + KV，步骤见该目录 README），得到网址与口令。
-2. 刷题应用顶栏「云同步」→ 填网址与口令 → 开启。
-3. 之后：打开自动拉取、有改动自动推送，多台设备打开即最新；冲突按每条记录的 `updatedAt` 保留新。
-4. iCloud 手动导入导出保留为离线兜底（离线单文件版不受云同步影响）。
+2. 「云同步」→ 同步方式选 Cloudflare Worker → 填网址与口令 → 开启。
+3. 注意：`workers.dev` 域名在国内大概率被屏蔽，此方式适合已绑定自定义域名或网络环境不受限的情况。
+
+iCloud 手动导入导出保留为离线兜底（离线单文件版不受云同步影响）。
 
 ## 数据
 

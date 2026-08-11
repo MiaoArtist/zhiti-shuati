@@ -2,6 +2,10 @@
 
 实现 `GET/PUT /api/sync`，配合刷题应用的「云同步」设置使用。
 
+> ⚠️ 国内网络说明：`*.workers.dev` 域名在大陆会被 DNS 污染 / HTTPS 握手重置，手机电脑都连不上。
+> 主应用现在默认使用 **GitHub 私有仓库同步**（国内直连可用，见 `../README.md`）。
+> 本 worker 保留为可选项：适合已绑定自定义域名（`sync.你的域名`）或网络不受限的场景。
+
 ## 部署步骤（一次性，免费）
 
 ```bash
@@ -20,6 +24,7 @@ npx wrangler deploy
 ```
 
 部署完成后会得到类似 `https://zhiti-sync.<你的子域>.workers.dev` 的地址。
+（workers.dev 子域是 Cloudflare 自动分配的，不能自定义，例如本账号分配的是 `synckv`。）
 
 ## 在刷题应用里配置
 

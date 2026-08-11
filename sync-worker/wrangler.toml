@@ -7,7 +7,7 @@ compatibility_date = "2025-01-01"
 # 把输出里的 id 填到下面，并设置你的同步口令：
 [[kv_namespaces]]
 binding = "SYNC_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "b49bc68fee224a20a4370ccb4eeaac37"
 
 [vars]
-SYNC_TOKEN = "REPLACE_WITH_YOUR_TOKEN"
+SYNC_TOKEN = "my-secret-token-123"
