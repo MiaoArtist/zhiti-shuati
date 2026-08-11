@@ -11,6 +11,7 @@
 <header class="topbar">
   <div class="brand">刷题<span class="sub">与「织题」联动</span></div>
   <div class="top-actions">
+    <button class="btn small" id="btn-cloud">云同步</button>
     <label class="btn small">导入数据<input type="file" id="import-file" accept=".json,application/json" hidden></label>
     <button class="btn small" id="btn-export">导出数据</button>
   </div>
@@ -23,6 +24,28 @@
   <div class="empty" id="home-empty" hidden>
     还没有题库。先在 Mac 上用织题的「PDF 导入」生成刷题 JSON，然后把文件放到 iCloud Drive，
     在这里点「导入数据」选择它。
+  </div>
+</template>
+
+<template id="tpl-settings">
+  <div class="paper-top">
+    <button class="btn small" id="btn-back">← 返回</button>
+    <span id="paper-title" style="font-weight:600">云同步</span>
+  </div>
+  <div class="question-card">
+    <div class="field-row">
+      <label class="check"><input type="checkbox" id="s-enabled"> 开启云同步</label>
+      <span class="qmeta" id="s-last"></span>
+    </div>
+    <p class="qmeta">数据存到你的云同步服务（刷题仓库 sync-worker 部署后得到的网址）。开启后：打开自动拉取、有改动自动推送，多台设备打开即最新。</p>
+    <div class="field-row"><label>同步地址（https://…workers.dev）</label>
+      <input id="s-url" type="url" placeholder="https://zhiti-sync.你的子域.workers.dev"></div>
+    <div class="field-row"><label>同步口令（部署时设置的 SYNC_TOKEN）</label>
+      <input id="s-token" type="password" placeholder="口令"></div>
+    <div class="q-foot">
+      <button class="btn" id="btn-sync-now">立即同步</button>
+      <button class="btn primary" id="btn-sync-save">保存设置</button>
+    </div>
   </div>
 </template>
 

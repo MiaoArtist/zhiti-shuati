@@ -79,3 +79,7 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 .empty { color: var(--muted); text-align: center; padding: 40px 16px; line-height: 2; }
 .badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 20px; background: #f0eee6; color: var(--muted); }
 .badge.subject { background: var(--accent-soft); color: var(--accent); }
+
+.field-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+.field-row input { padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; font-family: inherit; }
+.field-row .check { flex-direction: row; align-items: center; display: flex; gap: 6px; }

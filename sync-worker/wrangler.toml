@@ -1,0 +1,13 @@
+name = "zhiti-sync"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+# 部署前先执行：
+#   npx wrangler kv namespace create SYNC_KV
+# 把输出里的 id 填到下面，并设置你的同步口令：
+[[kv_namespaces]]
+binding = "SYNC_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[vars]
+SYNC_TOKEN = "REPLACE_WITH_YOUR_TOKEN"

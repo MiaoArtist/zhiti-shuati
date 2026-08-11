@@ -9,6 +9,13 @@
 3. **手机**：打开本应用 → 「导入数据」选择 iCloud 里的 JSON → 开始刷题（选择题自动判对错，大题手动标记，每题可写心得、可星标收藏）。
 4. **回织题**：手机端「导出数据」存到 iCloud Drive → Mac 织题「刷题导入」页选择该 JSON → 只导入被星标收藏的题，做错的自动标「重点待解决」。
 
+## 云同步（全自动）
+
+1. 部署 `sync-worker/`（Cloudflare Workers + KV，步骤见该目录 README），得到网址与口令。
+2. 刷题应用顶栏「云同步」→ 填网址与口令 → 开启。
+3. 之后：打开自动拉取、有改动自动推送，多台设备打开即最新；冲突按每条记录的 `updatedAt` 保留新。
+4. iCloud 手动导入导出保留为离线兜底（离线单文件版不受云同步影响）。
+
 ## 数据
 
 - 全部数据存在浏览器 localStorage（每台设备一份）。
@@ -38,3 +45,6 @@ gh repo create zhiti-shuati --public --source=. --push
 python3 build_offline.py   # 生成 dist/刷题-离线版.html
 # 把该单文件放进 iCloud Drive（三端同步/刷题/），手机用「文件」App 打开即可离线做题
 ```
+
+网址：
+https://miaoartist.github.io/zhiti-shuati/
