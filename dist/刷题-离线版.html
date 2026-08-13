@@ -31,6 +31,64 @@ body {
 .top-actions { display: flex; gap: 8px; }
 main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 
+.sync-chip {
+  align-self: center; font-size: 12px; padding: 3px 10px; border-radius: 20px;
+  border: 1px solid var(--line); color: var(--muted); background: #faf9f5; white-space: nowrap;
+}
+.sync-chip.ok { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
+.sync-chip.dirty { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+.sync-chip.syncing { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.sync-chip.off { color: var(--muted); }
+
+.sync-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 120;
+  text-align: center; padding: 9px 12px; font-size: 14px; font-weight: 600; color: #fff;
+  background: rgba(74, 111, 165, 0.85); backdrop-filter: blur(4px);
+}
+.sync-banner.ok { background: rgba(79, 143, 95, 0.9); }
+.sync-banner.error { background: rgba(192, 86, 79, 0.92); }
+
+.filterbar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 10px; margin-bottom: 12px;
+}
+.filterbar select {
+  padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px;
+  font-size: 14px; font-family: inherit; background: #fff;
+}
+.filterbar .check { display: flex; align-items: center; gap: 5px; font-size: 14px; color: var(--muted); }
+
+.mode-switch { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.mode-switch .mode-btn { border: none; border-radius: 0; background: #fff; color: var(--muted); }
+.mode-switch .mode-btn.active { background: var(--accent); color: #fff; }
+
+.opt-btn.chosen { border-color: var(--accent); background: var(--accent-soft); }
+
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal {
+  background: #fff; border-radius: 14px; max-width: 640px; width: 100%;
+  max-height: 86vh; display: flex; flex-direction: column; overflow: hidden;
+  padding: 16px;
+}
+.modal-head { display: flex; align-items: center; justify-content: space-between; font-size: 16px; }
+.modal-head .close {
+  border: none; background: none; font-size: 22px; cursor: pointer; color: var(--muted); line-height: 1;
+}
+.exp-body { overflow-y: auto; margin: 10px 0; }
+.exp-group { margin-bottom: 12px; }
+.exp-paper { font-weight: 600; margin-bottom: 4px; }
+.exp-row {
+  display: flex; gap: 8px; align-items: flex-start; padding: 6px 0;
+  border-bottom: 1px dashed var(--line); font-size: 14px;
+}
+.exp-row input { margin-top: 4px; }
+.exp-stem { flex: 1; white-space: pre-wrap; }
+.modal-foot { display: flex; align-items: center; gap: 10px; }
+
 .btn {
   border: 1px solid var(--line); background: #fff; color: var(--ink);
   padding: 9px 16px; border-radius: 10px; font-size: 15px; cursor: pointer;
@@ -97,12 +155,15 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 <header class="topbar">
   <div class="brand">刷题<span class="sub">与「织题」联动</span></div>
   <div class="top-actions">
-    <button class="btn small" id="btn-cloud">云同步</button>
+    <span class="sync-chip" id="sync-chip">未开启同步</span>
+    <button class="btn small" id="btn-sync">云同步</button>
+    <button class="btn small" id="btn-settings">设置</button>
     <label class="btn small">导入数据<input type="file" id="import-file" accept=".json,application/json" hidden></label>
     <button class="btn small" id="btn-export">导出数据</button>
   </div>
 </header>
 
+<div id="sync-banner" class="sync-banner" hidden></div>
 <main id="app"></main>
 
 <template id="tpl-home">
@@ -116,7 +177,7 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 <template id="tpl-settings">
   <div class="paper-top">
     <button class="btn small" id="btn-back">← 返回</button>
-    <span id="paper-title" style="font-weight:600">云同步</span>
+    <span id="paper-title" style="font-weight:600">设置</span>
   </div>
   <div class="question-card">
     <div class="field-row">
@@ -145,14 +206,30 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 <template id="tpl-paper">
   <div class="paper-top">
     <button class="btn small" id="btn-back">← 返回</button>
+    <span id="mode-chip" class="qmeta"></span>
     <span id="paper-title"></span>
     <span id="paper-progress" class="qmeta"></span>
+  </div>
+  <div class="filterbar" id="paper-filters">
+    <select id="pf-status">
+      <option value="">全部</option>
+      <option value="wrong">错题</option>
+      <option value="starred">收藏</option>
+      <option value="unanswered">未做</option>
+    </select>
+    <select id="pf-type">
+      <option value="">全部题型</option>
+      <option value="choice">选择题</option>
+      <option value="essay">大题</option>
+    </select>
+    <label class="check"><input type="checkbox" id="pf-shuffle"> 随机顺序</label>
   </div>
   <div class="question-card" id="qcard">
     <div id="q-stem" class="q-stem"></div>
     <div id="q-options"></div>
     <div id="q-essay" hidden>
       <p class="qmeta">本题为问答/材料题，请对照参考答案自评：</p>
+      <button class="btn grade-btn" id="btn-reveal">显示答案</button>
       <button class="btn grade-btn ok" id="btn-right">标记正确</button>
       <button class="btn grade-btn bad" id="btn-wrong">标记错误</button>
     </div>
@@ -164,18 +241,26 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
     <div class="q-foot">
       <button class="btn" id="btn-prev">上一题</button>
       <button class="btn" id="btn-star">☆ 收藏</button>
+      <div class="mode-switch">
+        <button class="btn small mode-btn" id="btn-mode-practice">刷题</button>
+        <button class="btn small mode-btn" id="btn-mode-back">背题</button>
+      </div>
       <button class="btn primary" id="btn-next">下一题</button>
     </div>
   </div>
   <div id="q-counts" class="qmeta"></div>
 </template>
 
+<div id="modal-root"></div>
 <script>'use strict';
 
 // ================= 存储层：IndexedDB（含 localStorage 迁移） =================
 const LS_KEY = 'zhiti_shuati_v1';   // 旧版 localStorage 数据键
 const CFG_KEY = 'zhiti_shuati_cfg'; // 云同步配置
+const CFG_EXPORT = 'zhiti_shuati_last_export'; // 上次成功导出的时间点（仅本机）
 const DB_NAME = 'zhiti_shuati_db';
+// 手机/平板（触摸设备）隐藏导出，专注刷题
+const IS_MOBILE = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -206,6 +291,10 @@ async function dbPut(val) {
 }
 
 let data = null;
+let dirty = false; // 有未同步到云端的本地改动
+let mode = localStorage.getItem('zhiti_mode') === 'back' ? 'back' : 'practice'; // practice=刷题模式, back=背题模式
+let lastExportAt = localStorage.getItem(CFG_EXPORT) || '';
+
 async function loadData() {
   try {
     const d = await dbGet();
@@ -224,6 +313,7 @@ async function loadData() {
 async function saveData() {
   data.updatedAt = new Date().toISOString();
   try { await dbPut(data); } catch (e) { console.warn('IndexedDB 写入失败', e); }
+  if (cloud.enabled) { dirty = true; setSyncChip('dirty'); }
   schedulePush();
 }
 
@@ -269,8 +359,48 @@ async function ghPut(jsonStr, sha) {
   if (!r.ok) { const e = new Error('GitHub HTTP ' + r.status); e.status = r.status; throw e; }
 }
 
+// ---------- 同步状态 UI ----------
+function setSyncChip(state) {
+  const el = $('#sync-chip');
+  if (!el) return;
+  if (!cloud.enabled) { el.textContent = '未开启同步'; el.className = 'sync-chip off'; return; }
+  if (state === 'syncing') { el.textContent = '同步中…'; el.className = 'sync-chip syncing'; return; }
+  if (state === 'dirty' || dirty) { el.textContent = '有未同步更改'; el.className = 'sync-chip dirty'; return; }
+  el.textContent = cloud.lastSync ? '已同步 ' + cloud.lastSync : '待同步';
+  el.className = 'sync-chip ok';
+}
+let bannerTimer = null;
+function showBanner(text, kind) {
+  const b = $('#sync-banner');
+  if (!b) return;
+  b.textContent = text;
+  b.className = 'sync-banner ' + (kind === 'syncing' ? 'syncing' : kind === 'error' ? 'error' : 'ok');
+  b.hidden = false;
+  clearTimeout(bannerTimer);
+  if (kind !== 'syncing') bannerTimer = setTimeout(() => { b.hidden = true; }, 3000);
+}
+async function doSync() {
+  if (!syncReady()) {
+    toast('请先到「设置」里配置并开启云同步', 'error');
+    view = { name: 'settings' }; render();
+    return;
+  }
+  showBanner('同步中…', 'syncing');
+  setSyncChip('syncing');
+  const pulled = await pullSync(false);
+  const pushed = await pushSync();
+  if (pulled && pushed) {
+    showBanner('同步成功', 'ok');
+    setSyncChip('synced');
+    toast('同步成功');
+  } else {
+    showBanner('同步失败：请检查网络或设置', 'error');
+    setSyncChip(pushed ? 'synced' : 'dirty');
+  }
+}
+
 async function pullSync(silent) {
-  if (!syncReady()) return;
+  if (!syncReady()) return false;
   try {
     let payload = null;
     if (cloud.mode === 'github') {
@@ -288,12 +418,15 @@ async function pullSync(silent) {
     }
     cloud.lastSync = new Date().toLocaleTimeString();
     saveCloudCfg();
+    setSyncChip('synced');
+    return true;
   } catch (e) {
     if (!silent) toast('同步拉取失败：' + e.message, 'error');
+    return false;
   }
 }
 async function pushSync() {
-  if (!syncReady()) return;
+  if (!syncReady()) return false;
   try {
     if (cloud.mode === 'github') {
       const jsonStr = JSON.stringify(data);
@@ -312,7 +445,14 @@ async function pushSync() {
     }
     cloud.lastSync = new Date().toLocaleTimeString();
     saveCloudCfg();
-  } catch (e) { console.warn('同步推送失败', e); }
+    dirty = false;
+    setSyncChip('synced');
+    return true;
+  } catch (e) {
+    console.warn('同步推送失败', e);
+    setSyncChip('dirty');
+    return false;
+  }
 }
 function mergeData(remote) {
   const localNewer = (data.updatedAt || '') >= (remote.updatedAt || '');
@@ -337,7 +477,7 @@ function mergeData(remote) {
 }
 
 // ================= 状态与工具 =================
-let view = { name: 'home', paperIdx: 0, qIdx: 0, answered: false };
+let view = { name: 'home', paperIdx: 0, qIdx: 0, order: null, shuffle: false, filters: { status: '', type: '' }, revealedIds: new Set() };
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -369,7 +509,7 @@ function setRec(p, q, patch) {
   saveData();
 }
 function curP() { return data.papers[view.paperIdx]; }
-function curQ() { return (curP().questions || [])[view.qIdx]; }
+function curQ() { return (curP().questions || [])[(view.order || [])[view.qIdx]]; }
 function letterOf(s) {
   const str = String(s || '');
   const m = str.match(/^\s*([A-H])\s*[.、．)）:：]/) || str.match(/^\s*([A-H])\s*$/);
@@ -411,7 +551,37 @@ function renderHome() {
 }
 
 function startPaper(i) {
-  view = { name: 'paper', paperIdx: i, qIdx: 0, answered: false };
+  view = { name: 'paper', paperIdx: i, qIdx: 0, order: null, shuffle: false, filters: { status: '', type: '' }, revealedIds: new Set() };
+  renderPaper();
+}
+
+function isEssay(q) { return q.type === 'essay' || !((q.options || []).length > 0); }
+function passesFilter(q) {
+  const r = getRec(curP(), q);
+  if (view.filters.status === 'wrong' && r.status !== 'wrong') return false;
+  if (view.filters.status === 'starred' && !r.starred) return false;
+  if (view.filters.status === 'unanswered' && r.status !== 'unanswered') return false;
+  if (view.filters.type === 'choice' && isEssay(q)) return false;
+  if (view.filters.type === 'essay' && !isEssay(q)) return false;
+  return true;
+}
+function buildOrder() {
+  const qs = curP().questions || [];
+  const cur = (view.order && view.order[view.qIdx] != null) ? view.order[view.qIdx] : 0;
+  let idxs = qs.map((_, i) => i).filter(i => passesFilter(qs[i]));
+  if (view.shuffle) {
+    for (let i = idxs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [idxs[i], idxs[j]] = [idxs[j], idxs[i]];
+    }
+  }
+  view.order = idxs;
+  const pos = idxs.indexOf(cur);
+  view.qIdx = pos >= 0 ? pos : 0;
+}
+function setMode(m) {
+  mode = m;
+  localStorage.setItem('zhiti_mode', m);
   renderPaper();
 }
 
@@ -421,9 +591,22 @@ function renderPaper() {
   main.innerHTML = tplPaper.innerHTML;
   $('#paper-title').textContent = p.name;
   const qs = p.questions || [];
-  const q = qs[view.qIdx];
-  $('#paper-progress').textContent = `${view.qIdx + 1} / ${qs.length}`;
-  if (!q) { main.innerHTML = '<div class="empty">这套卷没有题目</div>'; return; }
+  $('#pf-status').value = view.filters.status;
+  $('#pf-type').value = view.filters.type;
+  $('#pf-shuffle').checked = !!view.shuffle;
+  $('#btn-mode-practice').classList.toggle('active', mode === 'practice');
+  $('#btn-mode-back').classList.toggle('active', mode === 'back');
+  if (!view.order) buildOrder();
+  const list = view.order || [];
+  if (!list.length) {
+    $('#qcard').innerHTML = '<div class="empty">没有符合条件的题目，试试调整上方筛选</div>';
+    return;
+  }
+  if (view.qIdx >= list.length) view.qIdx = list.length - 1;
+  const q = qs[list[view.qIdx]];
+  const label = mode === 'back' ? '背题' : '刷题';
+  $('#mode-chip').textContent = `${label} ${view.qIdx + 1} / ${list.length}`;
+  $('#paper-progress').textContent = `${view.qIdx + 1} / ${list.length}`;
 
   const rec = getRec(p, q);
   $('#q-stem').textContent = q.stem;
@@ -436,34 +619,38 @@ function renderPaper() {
   $('#q-options').hidden = !isChoice;
   if (isChoice) {
     $('#q-options').innerHTML = opts.map(o => `<button class="opt-btn" data-opt="${esc(o)}" onclick="answerChoice(this)">${esc(o)}</button>`).join('');
+  } else {
+    const revealed = mode === 'back' || view.revealedIds.has(recKey(p, q));
+    $('#btn-reveal').style.display = revealed ? 'none' : '';
+    $('#btn-right').style.display = revealed ? '' : 'none';
+    $('#btn-wrong').style.display = revealed ? '' : 'none';
   }
-  view.answered = rec.status !== 'unanswered';
-  if (view.answered) showAnswerPanel(rec, q);
-  $('#q-answer').hidden = !view.answered;
-  $('#q-insight').hidden = !view.answered;
-  if (view.answered) {
+
+  const revealed = mode === 'back' || view.revealedIds.has(recKey(p, q));
+  $('#q-answer').hidden = !revealed;
+  $('#q-insight').hidden = !revealed;
+  if (revealed) {
+    showAnswerPanel(rec, q);
     const ta = $('#insight-input');
-    ta.value = rec.insight || '';
-    ta.oninput = debounce(() => setRec(p, q, { insight: ta.value }), 400);
+    if (ta) ta.value = rec.insight || '';
   }
   updateCounts();
   $('#btn-prev').disabled = view.qIdx === 0;
-  $('#btn-next').textContent = view.qIdx === qs.length - 1 ? '完成' : '下一题';
+  $('#btn-next').textContent = view.qIdx === list.length - 1 ? '完成' : '下一题';
 }
 
 function answerChoice(btn) {
   const p = curP(), q = curQ();
-  if (view.answered) return;
   const ansLetter = letterOf(q.answer);
   const chosenLetter = letterOf(btn.dataset.opt);
   const correct = ansLetter && chosenLetter === ansLetter;
   setRec(p, q, { status: correct ? 'right' : 'wrong' });
-  view.answered = true;
+  view.revealedIds.add(recKey(p, q));
   $$('#q-options .opt-btn').forEach(b => {
-    b.disabled = true;
+    b.classList.remove('correct', 'wrong', 'chosen');
     if (letterOf(b.dataset.opt) === ansLetter) b.classList.add('correct');
-    else if (b === btn && !correct) b.classList.add('wrong');
   });
+  btn.classList.add(correct ? 'chosen' : 'wrong');
   showAnswerPanel(getRec(p, q), q);
   $('#q-answer').hidden = false;
   $('#q-insight').hidden = false;
@@ -473,7 +660,7 @@ function answerChoice(btn) {
 function gradeEssay(status) {
   const p = curP(), q = curQ();
   setRec(p, q, { status });
-  view.answered = true;
+  view.revealedIds.add(recKey(p, q));
   showAnswerPanel(getRec(p, q), q);
   $('#q-answer').hidden = false;
   $('#q-insight').hidden = false;
@@ -524,9 +711,8 @@ function updateSyncUI() {
 }
 
 function nav(delta) {
-  const qs = curP().questions || [];
   const n = view.qIdx + delta;
-  if (n < 0 || n >= qs.length) return;
+  if (n < 0 || n >= (view.order || []).length) return;
   view.qIdx = n;
   renderPaper();
 }
@@ -548,10 +734,82 @@ async function importData(fileData) {
   toast(`题库已更新（${before} → ${data.papers.length} 卷），记录合并 ${merged} 条`);
 }
 
+// ---------- 导出收藏题（仅本机） ----------
+let exportRows = [];
+function openExport() {
+  exportRows = [];
+  for (const p of data.papers || []) {
+    for (const q of p.questions || []) {
+      const rec = getRec(p, q);
+      if (rec.starred) exportRows.push({ p, q, rec });
+    }
+  }
+  if (!exportRows.length) { toast('还没有收藏的题', 'error'); return; }
+  const byPaper = new Map();
+  exportRows.forEach((r, i) => {
+    if (!byPaper.has(r.p.id)) byPaper.set(r.p.id, { p: r.p, rows: [] });
+    byPaper.get(r.p.id).rows.push({ ...r, i });
+  });
+  const groups = [...byPaper.values()].map(g => `
+    <div class="exp-group">
+      <div class="exp-paper">${esc(g.p.name)} <span class="badge">${g.rows.length} 题</span></div>
+      ${g.rows.map(r => `
+        <label class="exp-row">
+          <input type="checkbox" class="exp-check" data-idx="${r.i}" ${defaultChecked(r.rec) ? 'checked' : ''}>
+          <span class="exp-stem">${esc(r.q.stem)}</span>
+          <span class="badge">${r.rec.status === 'wrong' ? '错' : (r.rec.status === 'right' ? '对' : '未做')}</span>
+        </label>`).join('')}
+    </div>`).join('');
+  $('#modal-root').innerHTML = `<div class="modal-mask"><div class="modal">
+    <div class="modal-head"><strong>导出收藏题（共 ${exportRows.length} 题）</strong><button class="close" onclick="closeExportModal()">×</button></div>
+    <p class="qmeta">默认勾选自上次导出后新收藏或变动的题；只有「导出并保存」后才算一次导出。</p>
+    <div class="exp-body">${groups}</div>
+    <div class="modal-foot">
+      <span id="exp-count" class="qmeta">已选择 0 题</span>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="closeExportModal()">取消</button>
+      <button class="btn primary" onclick="confirmExport()">导出并保存</button>
+    </div>
+  </div></div>`;
+  updateExportCount();
+  $('#modal-root').addEventListener('change', e => { if (e.target.classList && e.target.classList.contains('exp-check')) updateExportCount(); });
+}
+function defaultChecked(rec) {
+  return !lastExportAt || (rec.updatedAt || '') > lastExportAt;
+}
+function updateExportCount() {
+  const n = $$('#modal-root .exp-check:checked').length;
+  const el = $('#exp-count');
+  if (el) el.textContent = `已选择 ${n} 题`;
+}
+function closeExportModal() { $('#modal-root').innerHTML = ''; }
+function confirmExport() {
+  const idxs = $$('#modal-root .exp-check:checked').map(cb => +cb.dataset.idx);
+  if (!idxs.length) { toast('至少勾选一题', 'error'); return; }
+  const byPaper = new Map();
+  idxs.forEach(i => {
+    const r = exportRows[i];
+    if (!byPaper.has(r.p.id)) byPaper.set(r.p.id, { paper: r.p, questions: [], keys: [] });
+    const g = byPaper.get(r.p.id);
+    g.questions.push(r.q);
+    g.keys.push(r.p.id + '::' + r.q.id);
+  });
+  const papers = [...byPaper.values()].map(g => ({ ...g.paper, questions: g.questions }));
+  const records = {};
+  [...byPaper.values()].forEach(g => g.keys.forEach(k => { if (data.records[k]) records[k] = data.records[k]; }));
+  downloadJSON(`刷题-收藏-${new Date().toISOString().slice(0, 10)}.json`, { version: 1, papers, records, updatedAt: data.updatedAt });
+  lastExportAt = new Date().toISOString();
+  localStorage.setItem(CFG_EXPORT, lastExportAt);
+  closeExportModal();
+  toast(`已导出 ${idxs.length} 题（${papers.length} 卷）`);
+}
+
 // ================= 事件 =================
 function bind() {
-  $('#btn-export').addEventListener('click', () => downloadJSON(`刷题记录-${new Date().toISOString().slice(0, 10)}.json`, data));
-  $('#btn-cloud').addEventListener('click', () => { view = { name: 'settings' }; render(); });
+  if (IS_MOBILE) { const b = $('#btn-export'); if (b) b.style.display = 'none'; }
+  $('#btn-sync').addEventListener('click', doSync);
+  $('#btn-settings').addEventListener('click', () => { view = { name: 'settings' }; render(); });
+  $('#btn-export').addEventListener('click', openExport);
   $('#import-file').addEventListener('change', e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -566,7 +824,7 @@ function bind() {
     if (t.id === 'btn-back') { view = { name: 'home' }; render(); }
     else if (t.id === 'btn-prev') nav(-1);
     else if (t.id === 'btn-next') {
-      if (view.qIdx === (curP().questions || []).length - 1) { view = { name: 'home' }; render(); }
+      if (view.qIdx >= (view.order || []).length - 1) { view = { name: 'home' }; render(); }
       else nav(1);
     }
     else if (t.id === 'btn-star') {
@@ -579,6 +837,9 @@ function bind() {
     }
     else if (t.id === 'btn-right') gradeEssay('right');
     else if (t.id === 'btn-wrong') gradeEssay('wrong');
+    else if (t.id === 'btn-reveal') { view.revealedIds.add(recKey(curP(), curQ())); renderPaper(); }
+    else if (t.id === 'btn-mode-practice') setMode('practice');
+    else if (t.id === 'btn-mode-back') setMode('back');
     else if (t.id === 'btn-sync-save') {
       cloud.enabled = $('#s-enabled').checked;
       cloud.mode = $('#s-mode').value;
@@ -590,15 +851,21 @@ function bind() {
         return;
       }
       saveCloudCfg();
-      if (cloud.enabled) { toast('正在连接云端…'); pullSync(false).then(() => { renderSettings(); toast('云同步已开启'); }); }
-      else { toast('云同步已关闭（数据仍在本机）'); }
+      if (cloud.enabled) { renderSettings(); doSync(); }
+      else { setSyncChip(); toast('云同步已关闭（数据仍在本机）'); }
     }
     else if (t.id === 'btn-sync-now') {
-      pullSync(false).then(() => pushSync()).then(() => {
+      doSync().then(() => {
         const el = $('#s-last');
         if (el) el.textContent = cloud.lastSync ? `上次同步：${cloud.lastSync}` : '尚未同步';
       });
     }
+  });
+
+  document.addEventListener('change', e => {
+    if (e.target.id === 'pf-status') { view.filters.status = e.target.value; buildOrder(); renderPaper(); }
+    else if (e.target.id === 'pf-type') { view.filters.type = e.target.value; buildOrder(); renderPaper(); }
+    else if (e.target.id === 'pf-shuffle') { view.shuffle = e.target.checked; buildOrder(); renderPaper(); }
   });
 }
 
@@ -608,6 +875,7 @@ function bind() {
   data = await loadData();
   bind();
   render();
+  setSyncChip();
   if (cloud.enabled) pullSync(true);
 })();
 </script>
