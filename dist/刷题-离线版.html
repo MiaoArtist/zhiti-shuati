@@ -29,6 +29,23 @@ body {
 .brand { font-size: 20px; font-weight: 700; color: var(--accent); }
 .brand .sub { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 6px; }
 .top-actions { display: flex; gap: 8px; }
+.menu-btn { display: none; }
+.top-menu {
+  position: absolute; top: 100%; right: 12px; z-index: 110;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px; min-width: 210px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+.top-menu .btn, .top-menu .sync-chip { width: 100%; text-align: center; }
+.top-menu label.btn { display: block; }
+.menu-mode { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.menu-mode .mode-btn {
+  flex: 1; border: none; border-radius: 0; background: #fff; color: var(--muted);
+  padding: 8px; font-size: 14px; cursor: pointer;
+}
+.menu-mode .mode-btn.active { background: var(--accent); color: #fff; }
+
 main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 
 .sync-chip {
@@ -110,7 +127,7 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 .paper-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .paper-top #paper-title { font-weight: 600; flex: 1; }
 
-.question-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.question-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; touch-action: pan-y; }
 .q-stem { white-space: pre-wrap; font-size: 17px; margin-bottom: 14px; }
 .opt-btn {
   display: block; width: 100%; text-align: left; margin-bottom: 8px;
@@ -149,6 +166,12 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 .field-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
 .field-row input { padding: 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 15px; font-family: inherit; }
 .field-row .check { flex-direction: row; align-items: center; display: flex; gap: 6px; }
+
+@media (pointer: coarse), (max-width: 640px) {
+  .top-actions { display: none; }
+  .menu-btn { display: block; }
+  .q-foot .mode-switch { display: none; }
+}
 </style>
 </head>
 <body>
@@ -160,6 +183,18 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
     <button class="btn small" id="btn-settings">设置</button>
     <label class="btn small">导入数据<input type="file" id="import-file" accept=".json,application/json" hidden></label>
     <button class="btn small" id="btn-export">导出数据</button>
+  </div>
+  <button class="btn small menu-btn" id="btn-menu" aria-label="展开菜单">☰</button>
+  <div class="top-menu" id="top-menu" hidden>
+    <span class="sync-chip" id="menu-sync-chip">未开启同步</span>
+    <div class="menu-mode" id="menu-mode" hidden>
+      <button class="mode-btn" id="btn-menu-mode-practice">刷题</button>
+      <button class="mode-btn" id="btn-menu-mode-back">背题</button>
+    </div>
+    <button class="btn small" id="btn-menu-sync">云同步</button>
+    <button class="btn small" id="btn-menu-settings">设置</button>
+    <label class="btn small">导入数据<input type="file" id="import-file-menu" accept=".json,application/json" hidden></label>
+    <button class="btn small" id="btn-menu-export">导出数据</button>
   </div>
 </header>
 
@@ -318,7 +353,7 @@ async function saveData() {
 }
 
 // ================= 云同步配置 =================
-const cloud = { enabled: false, mode: 'github', url: '', repo: '', path: 'sync-data.json', token: '', lastSync: '' };
+const cloud = { enabled: false, mode: 'github', url: '', repo: 'MiaoArtist/zhiti-shuati-sync', path: 'sync-data.json', token: '', lastSync: '' };
 function loadCloudCfg() {
   try { Object.assign(cloud, JSON.parse(localStorage.getItem(CFG_KEY) || '{}')); } catch (e) { /* ignore */ }
   if (!cloud.mode) cloud.mode = 'github';
@@ -360,14 +395,17 @@ async function ghPut(jsonStr, sha) {
 }
 
 // ---------- 同步状态 UI ----------
-function setSyncChip(state) {
-  const el = $('#sync-chip');
+function applySyncChip(el, state) {
   if (!el) return;
   if (!cloud.enabled) { el.textContent = '未开启同步'; el.className = 'sync-chip off'; return; }
   if (state === 'syncing') { el.textContent = '同步中…'; el.className = 'sync-chip syncing'; return; }
   if (state === 'dirty' || dirty) { el.textContent = '有未同步更改'; el.className = 'sync-chip dirty'; return; }
   el.textContent = cloud.lastSync ? '已同步 ' + cloud.lastSync : '待同步';
   el.className = 'sync-chip ok';
+}
+function setSyncChip(state) {
+  applySyncChip($('#sync-chip'), state);
+  applySyncChip($('#menu-sync-chip'), state);
 }
 let bannerTimer = null;
 function showBanner(text, kind) {
@@ -500,6 +538,7 @@ function downloadJSON(filename, obj) {
 }
 
 function recKey(p, q) { return p.id + '::' + q.id; }
+function posKey(paperId) { return 'zhiti_shuati_pos_' + paperId; }
 function getRec(p, q) {
   return data.records[recKey(p, q)] || { status: 'unanswered', starred: false, insight: '', updatedAt: '' };
 }
@@ -526,6 +565,12 @@ function render() {
   if (view.name === 'paper') renderPaper();
   else if (view.name === 'settings') renderSettings();
   else renderHome();
+  updateMenuModeVisibility();
+}
+
+function updateMenuModeVisibility() {
+  const mm = $('#menu-mode');
+  if (mm) mm.hidden = view.name !== 'paper';
 }
 
 function renderHome() {
@@ -551,7 +596,9 @@ function renderHome() {
 }
 
 function startPaper(i) {
-  view = { name: 'paper', paperIdx: i, qIdx: 0, order: null, shuffle: false, filters: { status: '', type: '' }, revealedIds: new Set() };
+  const p = data.papers[i];
+  const saved = p ? parseInt(localStorage.getItem(posKey(p.id)) || '-1', 10) : -1;
+  view = { name: 'paper', paperIdx: i, qIdx: saved >= 0 ? saved : 0, order: null, shuffle: false, filters: { status: '', type: '' }, revealedIds: new Set() };
   renderPaper();
 }
 
@@ -567,7 +614,7 @@ function passesFilter(q) {
 }
 function buildOrder() {
   const qs = curP().questions || [];
-  const cur = (view.order && view.order[view.qIdx] != null) ? view.order[view.qIdx] : 0;
+  const cur = (view.order && view.order[view.qIdx] != null) ? view.order[view.qIdx] : (view.qIdx || 0);
   let idxs = qs.map((_, i) => i).filter(i => passesFilter(qs[i]));
   if (view.shuffle) {
     for (let i = idxs.length - 1; i > 0; i--) {
@@ -594,8 +641,14 @@ function renderPaper() {
   $('#pf-status').value = view.filters.status;
   $('#pf-type').value = view.filters.type;
   $('#pf-shuffle').checked = !!view.shuffle;
-  $('#btn-mode-practice').classList.toggle('active', mode === 'practice');
-  $('#btn-mode-back').classList.toggle('active', mode === 'back');
+  ['btn-mode-practice', 'btn-menu-mode-practice'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', mode === 'practice');
+  });
+  ['btn-mode-back', 'btn-menu-mode-back'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.classList.toggle('active', mode === 'back');
+  });
   if (!view.order) buildOrder();
   const list = view.order || [];
   if (!list.length) {
@@ -610,8 +663,7 @@ function renderPaper() {
 
   const rec = getRec(p, q);
   $('#q-stem').textContent = q.stem;
-  $('#btn-star').textContent = rec.starred ? '★ 已收藏' : '☆ 收藏';
-  $('#btn-star').classList.toggle('starred', !!rec.starred);
+  updateStarButton();
 
   const opts = q.options || [];
   const isChoice = opts.length > 0;
@@ -637,6 +689,7 @@ function renderPaper() {
   updateCounts();
   $('#btn-prev').disabled = view.qIdx === 0;
   $('#btn-next').textContent = view.qIdx === list.length - 1 ? '完成' : '下一题';
+  attachSwipe();
 }
 
 function answerChoice(btn) {
@@ -676,7 +729,17 @@ function showAnswerPanel(rec, q) {
   const ta = $('#insight-input');
   if (ta && !ta._bound) {
     ta._bound = true;
-    ta.oninput = debounce(() => setRec(curP(), curQ(), { insight: ta.value }), 400);
+    ta.oninput = debounce(() => {
+      const p = curP(), q = curQ(), r = getRec(p, q);
+      const v = ta.value;
+      if (v.trim() && !r.starred) {
+        setRec(p, q, { insight: v, starred: true });
+        updateStarButton();
+        toast('已收藏（写了心得）');
+      } else {
+        setRec(p, q, { insight: v });
+      }
+    }, 400);
   }
   if (ta) ta.value = rec.insight || '';
 }
@@ -714,7 +777,61 @@ function nav(delta) {
   const n = view.qIdx + delta;
   if (n < 0 || n >= (view.order || []).length) return;
   view.qIdx = n;
+  const p = curP();
+  if (p && view.order && view.order[view.qIdx] != null) {
+    localStorage.setItem(posKey(p.id), String(view.order[view.qIdx]));
+  }
   renderPaper();
+}
+function nextQuestion() {
+  if (view.qIdx >= (view.order || []).length - 1) { view = { name: 'home' }; render(); }
+  else nav(1);
+}
+function updateStarButton() {
+  const p = curP(), q = curQ(), rec = getRec(p, q);
+  const b = $('#btn-star');
+  if (!b) return;
+  b.textContent = rec.starred ? '★ 已收藏' : '☆ 收藏';
+  b.classList.toggle('starred', !!rec.starred);
+}
+
+// ---------- 触摸手势：左右翻页 / 上滑收藏 ----------
+function attachSwipe() {
+  if (!IS_MOBILE) return;
+  const card = $('#qcard');
+  if (!card) return;
+  let sx = 0, sy = 0, st = 0, sScroll = 0;
+  const ignore = e => e.target && e.target.closest && e.target.closest('textarea, input, select, button, .opt-btn');
+  card.addEventListener('touchstart', e => {
+    if (ignore(e)) return;
+    const t = e.touches[0];
+    sx = t.clientX; sy = t.clientY; st = Date.now(); sScroll = window.scrollY;
+  }, { passive: true });
+  card.addEventListener('touchend', e => {
+    if (ignore(e)) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    const dur = Date.now() - st;
+    const scrolled = Math.abs(window.scrollY - sScroll) > 30;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) >= 70) {
+      if (dx < 0) nextQuestion(); else nav(-1);
+    } else if (!scrolled && dy < -70 && Math.abs(dy) > Math.abs(dx) * 1.2 && dur < 450) {
+      const p = curP(), q = curQ(), r = getRec(p, q);
+      setRec(p, q, { starred: !r.starred });
+      updateStarButton();
+      toast(r.starred ? '已取消收藏' : '已收藏（上滑）');
+    }
+  }, { passive: true });
+}
+
+// ---------- 顶部展开菜单 ----------
+function toggleMenu() {
+  const m = $('#top-menu');
+  if (m) m.hidden = !m.hidden;
+}
+function closeMenu() {
+  const m = $('#top-menu');
+  if (m) m.hidden = true;
 }
 
 // ================= 导入 / 导出 =================
@@ -806,7 +923,10 @@ function confirmExport() {
 
 // ================= 事件 =================
 function bind() {
-  if (IS_MOBILE) { const b = $('#btn-export'); if (b) b.style.display = 'none'; }
+  if (IS_MOBILE) {
+    const b = $('#btn-export'); if (b) b.style.display = 'none';
+    const mb = $('#btn-menu-export'); if (mb) mb.style.display = 'none';
+  }
   $('#btn-sync').addEventListener('click', doSync);
   $('#btn-settings').addEventListener('click', () => { view = { name: 'settings' }; render(); });
   $('#btn-export').addEventListener('click', openExport);
@@ -819,20 +939,35 @@ function bind() {
     e.target.value = '';
   });
 
+  // 顶部展开菜单
+  $('#btn-menu').addEventListener('click', e => { e.stopPropagation(); toggleMenu(); });
+  document.addEventListener('click', e => {
+    const m = $('#top-menu');
+    if (m && !m.hidden && !e.target.closest('.topbar')) closeMenu();
+  });
+  $('#btn-menu-sync').addEventListener('click', () => { closeMenu(); doSync(); });
+  $('#btn-menu-settings').addEventListener('click', () => { closeMenu(); view = { name: 'settings' }; render(); });
+  $('#btn-menu-export').addEventListener('click', () => { closeMenu(); openExport(); });
+  $('#import-file-menu').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { try { importData(JSON.parse(r.result)); } catch (err) { toast('JSON 解析失败：' + err.message, 'error'); } };
+    r.readAsText(f);
+    e.target.value = '';
+  });
+  $('#btn-menu-mode-practice').addEventListener('click', () => { closeMenu(); setMode('practice'); });
+  $('#btn-menu-mode-back').addEventListener('click', () => { closeMenu(); setMode('back'); });
+
   document.addEventListener('click', e => {
     const t = e.target;
     if (t.id === 'btn-back') { view = { name: 'home' }; render(); }
     else if (t.id === 'btn-prev') nav(-1);
-    else if (t.id === 'btn-next') {
-      if (view.qIdx >= (view.order || []).length - 1) { view = { name: 'home' }; render(); }
-      else nav(1);
-    }
+    else if (t.id === 'btn-next') nextQuestion();
     else if (t.id === 'btn-star') {
       const p = curP(), q = curQ(), rec = getRec(p, q);
       setRec(p, q, { starred: !rec.starred });
-      const b = $('#btn-star');
-      b.textContent = rec.starred ? '☆ 收藏' : '★ 已收藏';
-      b.classList.toggle('starred', rec.starred);
+      updateStarButton();
       toast(rec.starred ? '已取消收藏' : '已收藏（可同步到云端）');
     }
     else if (t.id === 'btn-right') gradeEssay('right');

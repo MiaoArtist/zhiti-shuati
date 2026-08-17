@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>刷题</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <header class="topbar">
@@ -16,6 +16,18 @@
     <button class="btn small" id="btn-settings">设置</button>
     <label class="btn small">导入数据<input type="file" id="import-file" accept=".json,application/json" hidden></label>
     <button class="btn small" id="btn-export">导出数据</button>
+  </div>
+  <button class="btn small menu-btn" id="btn-menu" aria-label="展开菜单">☰</button>
+  <div class="top-menu" id="top-menu" hidden>
+    <span class="sync-chip" id="menu-sync-chip">未开启同步</span>
+    <div class="menu-mode" id="menu-mode" hidden>
+      <button class="mode-btn" id="btn-menu-mode-practice">刷题</button>
+      <button class="mode-btn" id="btn-menu-mode-back">背题</button>
+    </div>
+    <button class="btn small" id="btn-menu-sync">云同步</button>
+    <button class="btn small" id="btn-menu-settings">设置</button>
+    <label class="btn small">导入数据<input type="file" id="import-file-menu" accept=".json,application/json" hidden></label>
+    <button class="btn small" id="btn-menu-export">导出数据</button>
   </div>
 </header>
 
@@ -108,6 +120,6 @@
 </template>
 
 <div id="modal-root"></div>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
