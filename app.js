@@ -518,25 +518,28 @@ function attachSwipe() {
   if (!root) return;
   if (root.dataset.swipeBound) return; // main 元素常驻，只绑定一次，避免重复触发
   root.dataset.swipeBound = '1';
-  let sx = 0, sy = 0, st = 0, sScroll = 0, dx = 0, dy = 0, active = false;
+  let sx = 0, sy = 0, st = 0, sScroll = 0, dx = 0, dy = 0, active = false, selecting = false;
   // 只忽略真正的输入控件/链接/可编辑区；按钮、选项按钮允许滑动（点击仍正常）
   const ignore = e => e.target && e.target.closest && e.target.closest('input, select, textarea, a, [contenteditable]');
   const card = () => $('#qcard');
   const reset = () => {
     active = false;
+    selecting = false;
     dx = dy = 0;
     _swipeHintFired = false;
     const c = card();
     if (c) { c.style.transform = ''; c.classList.remove('swiping-x', 'swipe-left', 'swipe-right'); }
   };
+  // 一旦出现系统文本选区（长按选择/复制），本次触摸切换为“允许原生选择”，不再翻页
+  document.addEventListener('selectionchange', () => { if (active) selecting = true; });
   root.addEventListener('touchstart', e => {
     if (ignore(e)) return;
     const t = e.touches[0];
     sx = t.clientX; sy = t.clientY; st = Date.now(); sScroll = window.scrollY;
-    dx = 0; dy = 0; active = true; _swipeHintFired = false;
+    dx = 0; dy = 0; active = true; selecting = !!(window.getSelection && window.getSelection().toString()); _swipeHintFired = false;
   }, { passive: true });
   root.addEventListener('touchmove', e => {
-    if (!active || ignore(e)) return;
+    if (!active || ignore(e) || selecting) return;
     const t = e.touches[0];
     dx = t.clientX - sx; dy = t.clientY - sy;
     // 横向占优且有明显位移：卡片跟随 + 左右提示 + 阻止文本选择
@@ -561,12 +564,13 @@ function attachSwipe() {
     dx = t.clientX - sx; dy = t.clientY - sy;
     const dur = Date.now() - st;
     const scrolled = Math.abs(window.scrollY - sScroll) > 30;
-    const selecting = !!(window.getSelection && window.getSelection().toString());
+    const selectingNow = selecting || !!(window.getSelection && window.getSelection().toString());
     active = false;
+    selecting = false;
     const c = card();
     if (c) { c.style.transform = ''; c.classList.remove('swiping-x', 'swipe-left', 'swipe-right'); }
     // 复制/选取文本时不翻页
-    if (selecting) return;
+    if (selectingNow) return;
     // 左右翻页：放宽角度与时长，上下滚动过程中横滑也能生效
     if (Math.abs(dx) >= SWIPE_X_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.15) {
       if (dx < 0) nextQuestion(); else nav(-1);
