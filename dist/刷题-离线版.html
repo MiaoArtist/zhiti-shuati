@@ -127,7 +127,15 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 .paper-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .paper-top #paper-title { font-weight: 600; flex: 1; }
 
-.question-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; touch-action: pan-y; }
+.question-card { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; touch-action: pan-y; transition: transform .18s ease; }
+.question-card.swiping-x { transition: none; will-change: transform; }
+.question-card.swipe-left::after, .question-card.swipe-right::before {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  background: var(--accent); color: #fff; opacity: .9; pointer-events: none; z-index: 5;
+}
+.question-card.swipe-left::after { right: 12px; content: "← 上一题"; }
+.question-card.swipe-right::before { left: 12px; content: "下一题 →"; }
 .q-stem { white-space: pre-wrap; font-size: 17px; margin-bottom: 14px; }
 .opt-btn {
   display: block; width: 100%; text-align: left; margin-bottom: 8px;
@@ -599,7 +607,7 @@ function startPaper(i) {
   const p = data.papers[i];
   const saved = p ? parseInt(localStorage.getItem(posKey(p.id)) || '-1', 10) : -1;
   view = { name: 'paper', paperIdx: i, qIdx: saved >= 0 ? saved : 0, order: null, shuffle: false, filters: { status: '', type: '' }, revealedIds: new Set() };
-  renderPaper();
+  render(); // 走 render() 以确保手机端顶部菜单里的「背题/刷题」入口正确显示
 }
 
 function isEssay(q) { return q.type === 'essay' || !((q.options || []).length > 0); }
@@ -796,32 +804,78 @@ function updateStarButton() {
 }
 
 // ---------- 触摸手势：左右翻页 / 上滑收藏 ----------
+const SWIPE_X_THRESHOLD = 60;   // 横向翻页位移阈值
+const SWIPE_FOLLOW = 0.55;      // 手指拖动时卡片跟随系数
+const SWIPE_UP_THRESHOLD = 70;  // 上滑收藏位移阈值
+let _swipeHintFired = false;
+
 function attachSwipe() {
   if (!IS_MOBILE) return;
-  const card = $('#qcard');
-  if (!card) return;
-  let sx = 0, sy = 0, st = 0, sScroll = 0;
-  const ignore = e => e.target && e.target.closest && e.target.closest('textarea, input, select, button, .opt-btn');
-  card.addEventListener('touchstart', e => {
+  const root = main; // #app，覆盖整张试卷内容，题目卡片上下区域都能滑
+  if (!root) return;
+  let sx = 0, sy = 0, st = 0, sScroll = 0, dx = 0, dy = 0, active = false;
+  // 只忽略真正的输入控件/链接/可编辑区；按钮、选项按钮允许滑动（点击仍正常）
+  const ignore = e => e.target && e.target.closest && e.target.closest('input, select, textarea, a, [contenteditable]');
+  const card = () => $('#qcard');
+  const reset = () => {
+    active = false;
+    dx = dy = 0;
+    _swipeHintFired = false;
+    const c = card();
+    if (c) { c.style.transform = ''; c.classList.remove('swiping-x', 'swipe-left', 'swipe-right'); }
+  };
+  root.addEventListener('touchstart', e => {
     if (ignore(e)) return;
     const t = e.touches[0];
     sx = t.clientX; sy = t.clientY; st = Date.now(); sScroll = window.scrollY;
+    dx = 0; dy = 0; active = true; _swipeHintFired = false;
   }, { passive: true });
-  card.addEventListener('touchend', e => {
-    if (ignore(e)) return;
+  root.addEventListener('touchmove', e => {
+    if (!active || ignore(e)) return;
+    const t = e.touches[0];
+    dx = t.clientX - sx; dy = t.clientY - sy;
+    // 横向占优且有明显位移：卡片跟随 + 左右提示 + 阻止文本选择
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+      e.preventDefault();
+      const c = card();
+      if (c) {
+        c.style.transform = `translateX(${dx * SWIPE_FOLLOW}px)`;
+        c.classList.add('swiping-x');
+        c.classList.toggle('swipe-left', dx < -SWIPE_X_THRESHOLD);
+        c.classList.toggle('swipe-right', dx > SWIPE_X_THRESHOLD);
+      }
+      if (!_swipeHintFired && Math.abs(dx) >= SWIPE_X_THRESHOLD) {
+        _swipeHintFired = true;
+        if (navigator.vibrate) navigator.vibrate(10);
+      }
+    }
+  }, { passive: false });
+  root.addEventListener('touchend', e => {
+    if (!active) return;
     const t = e.changedTouches[0];
-    const dx = t.clientX - sx, dy = t.clientY - sy;
+    dx = t.clientX - sx; dy = t.clientY - sy;
     const dur = Date.now() - st;
     const scrolled = Math.abs(window.scrollY - sScroll) > 30;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) >= 70) {
+    const selecting = !!(window.getSelection && window.getSelection().toString());
+    active = false;
+    const c = card();
+    if (c) { c.style.transform = ''; c.classList.remove('swiping-x', 'swipe-left', 'swipe-right'); }
+    // 复制/选取文本时不翻页
+    if (selecting) return;
+    // 左右翻页：放宽角度与时长，上下滚动过程中横滑也能生效
+    if (Math.abs(dx) >= SWIPE_X_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.15) {
       if (dx < 0) nextQuestion(); else nav(-1);
-    } else if (!scrolled && dy < -70 && Math.abs(dy) > Math.abs(dx) * 1.2 && dur < 450) {
+      return;
+    }
+    // 上滑收藏
+    if (!scrolled && dy < -SWIPE_UP_THRESHOLD && Math.abs(dy) > Math.abs(dx) * 1.2 && dur < 450) {
       const p = curP(), q = curQ(), r = getRec(p, q);
       setRec(p, q, { starred: !r.starred });
       updateStarButton();
       toast(r.starred ? '已取消收藏' : '已收藏（上滑）');
     }
   }, { passive: true });
+  root.addEventListener('touchcancel', reset);
 }
 
 // ---------- 顶部展开菜单 ----------

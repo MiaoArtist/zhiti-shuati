@@ -120,7 +120,15 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 .paper-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .paper-top #paper-title { font-weight: 600; flex: 1; }
 
-.question-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; touch-action: pan-y; }
+.question-card { position: relative; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; touch-action: pan-y; transition: transform .18s ease; }
+.question-card.swiping-x { transition: none; will-change: transform; }
+.question-card.swipe-left::after, .question-card.swipe-right::before {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  background: var(--accent); color: #fff; opacity: .9; pointer-events: none; z-index: 5;
+}
+.question-card.swipe-left::after { right: 12px; content: "← 上一题"; }
+.question-card.swipe-right::before { left: 12px; content: "下一题 →"; }
 .q-stem { white-space: pre-wrap; font-size: 17px; margin-bottom: 14px; }
 .opt-btn {
   display: block; width: 100%; text-align: left; margin-bottom: 8px;
