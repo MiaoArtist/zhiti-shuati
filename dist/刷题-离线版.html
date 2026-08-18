@@ -813,6 +813,8 @@ function attachSwipe() {
   if (!IS_MOBILE) return;
   const root = main; // #app，覆盖整张试卷内容，题目卡片上下区域都能滑
   if (!root) return;
+  if (root.dataset.swipeBound) return; // main 元素常驻，只绑定一次，避免重复触发
+  root.dataset.swipeBound = '1';
   let sx = 0, sy = 0, st = 0, sScroll = 0, dx = 0, dy = 0, active = false;
   // 只忽略真正的输入控件/链接/可编辑区；按钮、选项按钮允许滑动（点击仍正常）
   const ignore = e => e.target && e.target.closest && e.target.closest('input, select, textarea, a, [contenteditable]');
