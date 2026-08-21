@@ -10,8 +10,8 @@ html = (root / "index.html").read_text(encoding="utf-8")
 css = (root / "style.css").read_text(encoding="utf-8")
 js = (root / "app.js").read_text(encoding="utf-8")
 
-html = html.replace('<link rel="stylesheet" href="style.css?v=7">', "<style>" + css + "</style>")
-html = html.replace('<script src="app.js?v=7"></script>', "<script>" + js + "</script>")
+html = html.replace('<link rel="stylesheet" href="style.css?v=8">', "<style>" + css + "</style>")
+html = html.replace('<script src="app.js?v=8"></script>', "<script>" + js + "</script>")
 
 out = root / "dist" / "刷题-离线版.html"
 out.parent.mkdir(exist_ok=True)

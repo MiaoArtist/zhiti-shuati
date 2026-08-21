@@ -303,6 +303,7 @@ function renderHome() {
     return `<div class="paper-card" onclick="startPaper(${i})">
       <div class="paper-name">${esc(p.name)} <span class="badge subject">${esc(p.subject || '')}</span>
         <button class="btn small paper-rename" onclick="event.stopPropagation();renamePaper(${i})" title="重命名套题">✏️</button>
+        <button class="btn small paper-delete" onclick="event.stopPropagation();deletePaper(${i})" title="删除套卷">🗑</button>
       </div>
       <div class="paper-meta">${done}/${total} 已做 · 🔴 ${wrong} · ⭐ ${starred}</div>
       <div class="progress"><div style="width:${pct}%"></div></div>
@@ -326,6 +327,19 @@ function renamePaper(i) {
   saveData();
   renderHome();
   toast('套题已重命名，导出数据将自动使用新名称');
+}
+
+function deletePaper(i) {
+  const p = data.papers[i];
+  if (!p) return;
+  if (!confirm(`确认删除套卷「${p.name}」？\n该卷的全部做题记录也会一并删除。`)) return;
+  data.papers.splice(i, 1);
+  const prefix = p.id + '::';
+  Object.keys(data.records).forEach(k => { if (k.startsWith(prefix)) delete data.records[k]; });
+  saveData();
+  if (view.name === 'paper' && view.paperIdx === i) view.name = 'home';
+  render();
+  toast('套卷已删除');
 }
 
 function isEssay(q) { return q.type === 'essay' || !((q.options || []).length > 0); }
@@ -489,7 +503,7 @@ function showOverview() {
     const q = p.questions[qi];
     const r = getRec(p, q);
     const cls = r.status === 'right' ? 'ok' : r.status === 'wrong' ? 'bad' : 'none';
-    return `<div class="ov-cell ${cls}" onclick="gotoOverview(${pos})">${esc(q.id || String(pos + 1))}</div>`;
+    return `<div class="ov-cell ${cls}" onclick="gotoOverview(${pos})">${String(pos + 1)}</div>`;
   }).join('');
   $('#modal-root').innerHTML = `<div class="modal-mask"><div class="modal">
     <div class="modal-head"><strong>题概览 · ${esc(p.name)}</strong><button class="close" onclick="closeOverview()">×</button></div>
@@ -776,6 +790,7 @@ function bind() {
   document.addEventListener('click', e => {
     const t = e.target;
     if (t.id === 'btn-back') { view = { name: 'home' }; render(); }
+    else if (t.id === 'btn-overview-top') showOverview();
     else if (t.id === 'btn-prev') nav(-1);
     else if (t.id === 'btn-next') nextQuestion();
     else if (t.id === 'btn-star') {
