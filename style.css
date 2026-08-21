@@ -6,11 +6,13 @@
   --warn: #b8860b; --warn-soft: #faf3e3;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { overscroll-behavior-y: contain; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif;
   font-size: 16px; line-height: 1.65;
   padding-bottom: env(safe-area-inset-bottom);
+  overscroll-behavior-y: contain;
 }
 .topbar {
   position: sticky; top: 0; z-index: 10;
@@ -99,6 +101,19 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 .exp-stem { flex: 1; white-space: pre-wrap; }
 .modal-foot { display: flex; align-items: center; gap: 10px; }
 
+.overview-grid {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  max-height: 62vh; overflow-y: auto; margin: 12px 0; padding: 4px;
+}
+.ov-cell {
+  width: 46px; height: 46px; display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+  border: 1px solid var(--line); background: #f2f1ec; color: var(--muted);
+}
+.ov-cell.ok { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.ov-cell.bad { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+.ov-cell.none { background: #efeee9; color: var(--muted); }
+
 .btn {
   border: 1px solid var(--line); background: #fff; color: var(--ink);
   padding: 9px 16px; border-radius: 10px; font-size: 15px; cursor: pointer;
@@ -113,6 +128,7 @@ main { max-width: 720px; margin: 0 auto; padding: 14px 14px 40px; }
 }
 .paper-card:active { background: var(--accent-soft); }
 .paper-name { font-weight: 600; }
+.paper-rename { margin-left: 6px; padding: 2px 6px; font-size: 12px; line-height: 1.4; vertical-align: middle; }
 .paper-meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
 .progress { height: 6px; background: #eee; border-radius: 3px; margin-top: 10px; overflow: hidden; }
 .progress > div { height: 100%; background: var(--ok); }

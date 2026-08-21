@@ -282,6 +282,8 @@ function render() {
 function updateMenuModeVisibility() {
   const mm = $('#menu-mode');
   if (mm) mm.hidden = view.name !== 'paper';
+  const ov = $('#btn-menu-overview');
+  if (ov) ov.hidden = view.name !== 'paper';
 }
 
 function renderHome() {
@@ -299,7 +301,9 @@ function renderHome() {
     }
     const pct = total ? Math.round(done / total * 100) : 0;
     return `<div class="paper-card" onclick="startPaper(${i})">
-      <div class="paper-name">${esc(p.name)} <span class="badge subject">${esc(p.subject || '')}</span></div>
+      <div class="paper-name">${esc(p.name)} <span class="badge subject">${esc(p.subject || '')}</span>
+        <button class="btn small paper-rename" onclick="event.stopPropagation();renamePaper(${i})" title="重命名套题">✏️</button>
+      </div>
       <div class="paper-meta">${done}/${total} 已做 · 🔴 ${wrong} · ⭐ ${starred}</div>
       <div class="progress"><div style="width:${pct}%"></div></div>
     </div>`;
@@ -311,6 +315,17 @@ function startPaper(i) {
   const saved = p ? parseInt(localStorage.getItem(posKey(p.id)) || '-1', 10) : -1;
   view = { name: 'paper', paperIdx: i, qIdx: saved >= 0 ? saved : 0, order: null, shuffle: false, filters: { status: '', type: '' }, revealedIds: new Set() };
   render(); // 走 render() 以确保手机端顶部菜单里的「背题/刷题」入口正确显示
+}
+
+function renamePaper(i) {
+  const p = data.papers[i];
+  if (!p) return;
+  const name = prompt('重命名套题：', p.name);
+  if (!name || !name.trim() || name.trim() === p.name) return;
+  p.name = name.trim();
+  saveData();
+  renderHome();
+  toast('套题已重命名，导出数据将自动使用新名称');
 }
 
 function isEssay(q) { return q.type === 'essay' || !((q.options || []).length > 0); }
@@ -464,6 +479,37 @@ function updateCounts() {
   if (el) el.textContent = `本卷进度：${done}/${qs.length} 已做 · 错 ${wrong} 题`;
 }
 
+// ---------- 题概览 ----------
+function showOverview() {
+  const p = curP();
+  if (!p || !(p.questions || []).length) { toast('当前试卷没有题目', 'error'); return; }
+  if (!view.order) buildOrder();
+  const list = view.order || [];
+  const grid = list.map((qi, pos) => {
+    const q = p.questions[qi];
+    const r = getRec(p, q);
+    const cls = r.status === 'right' ? 'ok' : r.status === 'wrong' ? 'bad' : 'none';
+    return `<div class="ov-cell ${cls}" onclick="gotoOverview(${pos})">${esc(q.id || String(pos + 1))}</div>`;
+  }).join('');
+  $('#modal-root').innerHTML = `<div class="modal-mask"><div class="modal">
+    <div class="modal-head"><strong>题概览 · ${esc(p.name)}</strong><button class="close" onclick="closeOverview()">×</button></div>
+    <div class="overview-grid">${grid}</div>
+    <div class="modal-foot"><span class="qmeta">绿=对 · 红=错 · 灰=未做</span><div style="flex:1"></div><button class="btn" onclick="closeOverview()">关闭</button></div>
+  </div></div>`;
+}
+
+function gotoOverview(pos) {
+  const list = view.order || [];
+  if (list[pos] == null) return;
+  view.qIdx = pos;
+  const p = curP();
+  if (p) localStorage.setItem(posKey(p.id), String(list[pos]));
+  closeOverview();
+  renderPaper();
+}
+
+function closeOverview() { $('#modal-root').innerHTML = ''; }
+
 function renderSettings() {
   main.innerHTML = tplSettings.innerHTML;
   $('#s-enabled').checked = cloud.enabled;
@@ -508,7 +554,7 @@ function updateStarButton() {
 
 // ---------- 触摸手势：左右翻页 / 上滑收藏 ----------
 const SWIPE_X_THRESHOLD = 60;   // 横向翻页位移阈值
-const SWIPE_FOLLOW = 0.55;      // 手指拖动时卡片跟随系数
+const SWIPE_FOLLOW = 0.45;      // 手指拖动时卡片跟随系数（低一点，拖动阻尼感更强）
 const SWIPE_UP_THRESHOLD = 70;  // 上滑收藏位移阈值
 let _swipeHintFired = false;
 
@@ -522,13 +568,19 @@ function attachSwipe() {
   // 只忽略真正的输入控件/链接/可编辑区；按钮、选项按钮允许滑动（点击仍正常）
   const ignore = e => e.target && e.target.closest && e.target.closest('input, select, textarea, a, [contenteditable]');
   const card = () => $('#qcard');
+  // 先恢复 transition，再在下一帧清 transform：让未达阈值的回弹走平滑动画
+  const springBack = c => {
+    if (!c) return;
+    c.classList.remove('swipe-left', 'swipe-right');
+    c.classList.remove('swiping-x');
+    requestAnimationFrame(() => { if (c) c.style.transform = ''; });
+  };
   const reset = () => {
     active = false;
     selecting = false;
     dx = dy = 0;
     _swipeHintFired = false;
-    const c = card();
-    if (c) { c.style.transform = ''; c.classList.remove('swiping-x', 'swipe-left', 'swipe-right'); }
+    springBack(card());
   };
   // 一旦出现系统文本选区（长按选择/复制），本次触摸切换为“允许原生选择”，不再翻页
   document.addEventListener('selectionchange', () => { if (active) selecting = true; });
@@ -554,7 +606,6 @@ function attachSwipe() {
       }
       if (!_swipeHintFired && Math.abs(dx) >= SWIPE_X_THRESHOLD) {
         _swipeHintFired = true;
-        if (navigator.vibrate) navigator.vibrate(10);
       }
     }
   }, { passive: false });
@@ -567,8 +618,7 @@ function attachSwipe() {
     const selectingNow = selecting || !!(window.getSelection && window.getSelection().toString());
     active = false;
     selecting = false;
-    const c = card();
-    if (c) { c.style.transform = ''; c.classList.remove('swiping-x', 'swipe-left', 'swipe-right'); }
+    springBack(card());
     // 复制/选取文本时不翻页
     if (selectingNow) return;
     // 左右翻页：放宽角度与时长，上下滚动过程中横滑也能生效
@@ -721,6 +771,7 @@ function bind() {
   });
   $('#btn-menu-mode-practice').addEventListener('click', () => { closeMenu(); setMode('practice'); });
   $('#btn-menu-mode-back').addEventListener('click', () => { closeMenu(); setMode('back'); });
+  $('#btn-menu-overview').addEventListener('click', () => { closeMenu(); showOverview(); });
 
   document.addEventListener('click', e => {
     const t = e.target;
